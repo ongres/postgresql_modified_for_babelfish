@@ -1,0 +1,40 @@
+# SET THIS CONNECTION STRING TO GENERATE THE EXPECTED OUTPUT FILE
+URL = localhost
+tsql_port = 1433
+psql_port = 5432
+databaseName = master
+physicalDatabaseName = jdbc_testdb
+user = jdbc_user
+password = 12345678
+
+# PATH TO INPUT TEST FILES FOLDER
+inputFilesPath = input
+
+# SPECIFY IF YOU WISH TO PRINT ALL THE SUMMARY LOGS/DIFF TO CONSOLE
+printLogsToConsole = false
+
+# SPECIFY WHICH JDBC DRIVER TO USE. CHOOSE FROM "postgresql" OR "sqlserver"
+driver = sqlserver
+
+# SPECIFY IF YOU WANT TO GENERATE A PERFORMANCE REPORT
+performanceTest = false
+
+# TO OVERCOME CERTAIN LIMITATIONS OF BABELFISH, INTRODUCED THE FOLLOWING 2 FLAGS
+# SET THESE FLAGS TO "false" WHILE GENERATING OUTPUT FILES YOU WISH TO CHECK INSIDE 
+# THE "expected" FOLDER. THESE FLAGS ARE ONLY THERE FOR PURPOSE OF DEBUGGING
+
+# BABEL-415 AND BABEL-681
+# SPECIFY IF COLUMN NAMES SHOULD BE ACCOMPANYING RESULT SETS IN OUTPUT FILE
+outputColumnName = false
+
+# BABEL-780 AND BABEL-1012
+# SPECIFY IF ERROR CODE SHOULD BE DISPLAYED IN OUTPUT FILE
+outputErrorCode = true
+
+############################################ WHICH TEST TO RUN ############################################
+
+# PLEASE LOOK AT THE jdbc_schedule FILE
+scheduleFile = ./jdbc_schedule
+
+# Where to find the input, output, expected, etc.
+testFileRoot = ./
