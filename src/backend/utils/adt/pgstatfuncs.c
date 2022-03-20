@@ -31,9 +31,16 @@
 #include "utils/inet.h"
 #include "utils/timestamp.h"
 
+tsql_has_pgstat_permissions_hook_type tsql_has_pgstat_permissions_hook = NULL;
+
 #define UINT32_ACCESS_ONCE(var)		 ((uint32)(*((volatile uint32 *)&(var))))
 
-#define HAS_PGSTAT_PERMISSIONS(role)	 (is_member_of_role(GetUserId(), DEFAULT_ROLE_READ_ALL_STATS) || has_privs_of_role(GetUserId(), role))
+/*
+ * Additionally if the babelfishpg_tsql extension is loaded, and if the current
+ * session user is sysadmin of babelfish db or has the privileges of a role that
+ * has permissions to view pg stats, then such a user can also view pg stats.
+ */
+#define HAS_PGSTAT_PERMISSIONS(role)	 (is_member_of_role(GetUserId(), DEFAULT_ROLE_READ_ALL_STATS) || has_privs_of_role(GetUserId(), role) || (tsql_has_pgstat_permissions_hook ? (*tsql_has_pgstat_permissions_hook)(role) : false))
 
 /* Global bgwriter statistics, from bgwriter.c */
 extern PgStat_MsgBgWriter bgwriterStats;
@@ -1744,7 +1751,7 @@ pg_stat_get_slru(PG_FUNCTION_ARGS)
 		/* for each row */
 		Datum		values[PG_STAT_GET_SLRU_COLS];
 		bool		nulls[PG_STAT_GET_SLRU_COLS];
-		PgStat_SLRUStats stat = stats[i];
+		PgStat_SLRUStats stat;
 		const char *name;
 
 		name = pgstat_slru_name(i);
@@ -1752,6 +1759,7 @@ pg_stat_get_slru(PG_FUNCTION_ARGS)
 		if (!name)
 			break;
 
+		stat = stats[i];
 		MemSet(values, 0, sizeof(values));
 		MemSet(nulls, 0, sizeof(nulls));
 

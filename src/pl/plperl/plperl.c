@@ -298,9 +298,11 @@ static char *strip_trailing_ws(const char *msg);
 static OP  *pp_require_safe(pTHX);
 static void activate_interpreter(plperl_interp_desc *interp_desc);
 
-#ifdef WIN32
+#if defined(WIN32) && PERL_VERSION_LT(5, 28, 0)
 static char *setlocale_perl(int category, char *locale);
-#endif
+#else
+#define setlocale_perl(a,b)  Perl_setlocale(a,b)
+#endif							/* defined(WIN32) && PERL_VERSION_LT(5, 28, 0) */
 
 /*
  * Decrement the refcount of the given SV within the active Perl interpreter
@@ -2112,8 +2114,8 @@ plperl_create_sub(plperl_proc_desc *prodesc, const char *s, Oid fn_oid)
 	 * errors properly.  Perhaps it's because there's another level of eval
 	 * inside mksafefunc?
 	 */
-	count = perl_call_pv("PostgreSQL::InServer::mkfunc",
-						 G_SCALAR | G_EVAL | G_KEEPERR);
+	count = call_pv("PostgreSQL::InServer::mkfunc",
+					G_SCALAR | G_EVAL | G_KEEPERR);
 	SPAGAIN;
 
 	if (count == 1)
@@ -2218,7 +2220,7 @@ plperl_call_perl_func(plperl_proc_desc *desc, FunctionCallInfo fcinfo)
 	PUTBACK;
 
 	/* Do NOT use G_KEEPERR here */
-	count = perl_call_sv(desc->reference, G_SCALAR | G_EVAL);
+	count = call_sv(desc->reference, G_SCALAR | G_EVAL);
 
 	SPAGAIN;
 
@@ -2286,7 +2288,7 @@ plperl_call_perl_trigger_func(plperl_proc_desc *desc, FunctionCallInfo fcinfo,
 	PUTBACK;
 
 	/* Do NOT use G_KEEPERR here */
-	count = perl_call_sv(desc->reference, G_SCALAR | G_EVAL);
+	count = call_sv(desc->reference, G_SCALAR | G_EVAL);
 
 	SPAGAIN;
 
@@ -2349,7 +2351,7 @@ plperl_call_perl_event_trigger_func(plperl_proc_desc *desc,
 	PUTBACK;
 
 	/* Do NOT use G_KEEPERR here */
-	count = perl_call_sv(desc->reference, G_SCALAR | G_EVAL);
+	count = call_sv(desc->reference, G_SCALAR | G_EVAL);
 
 	SPAGAIN;
 
@@ -4135,8 +4137,10 @@ plperl_inline_callback(void *arg)
 /*
  * Perl's own setlocale(), copied from POSIX.xs
  * (needed because of the calls to new_*())
+ *
+ * Starting in 5.28, perl exposes Perl_setlocale to do so.
  */
-#ifdef WIN32
+#if defined(WIN32) && PERL_VERSION_LT(5, 28, 0)
 static char *
 setlocale_perl(int category, char *locale)
 {
@@ -4204,5 +4208,4 @@ setlocale_perl(int category, char *locale)
 
 	return RETVAL;
 }
-
-#endif							/* WIN32 */
+#endif							/* defined(WIN32) && PERL_VERSION_LT(5, 28, 0) */

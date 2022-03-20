@@ -15,6 +15,7 @@
 
 #include "postgres.h"
 
+#include "catalog/namespace.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
 #include "miscadmin.h"
@@ -131,6 +132,7 @@ static Expr *make_distinct_op(ParseState *pstate, List *opname,
 static Node *make_nulltest_from_distinct(ParseState *pstate,
 										 A_Expr *distincta, Node *arg);
 static int	operator_precedence_group(Node *node, const char **nodename);
+static List *ExpandChecksumStar(ParseState *pstate, FuncCall *fn, int location);
 static void emit_precedence_warnings(ParseState *pstate,
 									 int opgroup, const char *opname,
 									 Node *lchild, Node *rchild,
@@ -926,6 +928,14 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 		}
 	}
 
+	if (pstate->p_column_ref_overwrite_hook && sql_dialect == SQL_DIALECT_TSQL)
+	{
+		Node *hookresult = pstate->p_column_ref_overwrite_hook(pstate, cref, node);
+
+		if (hookresult)
+			node = hookresult;
+	}
+
 	return node;
 }
 
@@ -1334,6 +1344,11 @@ transformAExprIn(ParseState *pstate, A_Expr *a)
 		allexprs = list_concat(list_make1(lexpr), rnonvars);
 		scalar_type = select_common_type(pstate, allexprs, NULL, NULL);
 
+		/* We have to verify that the selected type actually works */
+		if (OidIsValid(scalar_type) &&
+			!verify_common_type(scalar_type, allexprs))
+			scalar_type = InvalidOid;
+
 		/*
 		 * Do we have an array type to use?  Aside from the case where there
 		 * isn't one, we don't risk using ScalarArrayOpExpr when the common
@@ -1576,6 +1591,8 @@ transformFuncCall(ParseState *pstate, FuncCall *fn)
 	Node	   *last_srf = pstate->p_last_srf;
 	List	   *targs;
 	ListCell   *args;
+      char *schemaname;
+      char *functionname;
 
 	/* Transform the list of arguments ... */
 	targs = NIL;
@@ -1604,6 +1621,20 @@ transformFuncCall(ParseState *pstate, FuncCall *fn)
 												 EXPR_KIND_ORDER_BY));
 		}
 	}
+        
+      DeconstructQualifiedName(fn->funcname, &schemaname, &functionname);
+
+      /* Firstly, we check whether the schema name is null or 'sys'.
+       * When the function name is checksum, we check if the argument is '*',
+       * if yes, then we traverse the table and get the column names from the
+       * table. We replace the argument '*' with the list of column names.
+       */
+
+      if (!schemaname || (strlen(schemaname) == 3 && strncmp(schemaname, "sys", 3) == 0))
+              if (strlen(functionname) == 8 &&
+                          strncmp(functionname, "checksum", 8) == 0 &&
+                          fn->agg_star == true)
+                      targs = ExpandChecksumStar(pstate, fn, fn->location);
 
 	/* ... and hand off to ParseFuncOrColumn */
 	return ParseFuncOrColumn(pstate,
@@ -2370,6 +2401,19 @@ transformCoalesceExpr(ParseState *pstate, CoalesceExpr *c)
 		newe = coerce_to_common_type(pstate, e,
 									 newc->coalescetype,
 									 "COALESCE");
+
+		/*
+		 * If we get a RelabelType node, we would need to adjust its typmod
+		 * as coerce_to_common_type function does not do length-coercion.
+		 * This is required when coercing a domain to its base type and since
+		 * domains are allowed to have typmod in TSQL mode, we should preserve
+		 * the typmod in this case.
+		 */
+		if (sql_dialect == SQL_DIALECT_TSQL && IsA(newe, RelabelType))
+		{
+			if (exprTypmod(newe) != exprTypmod(e))
+				((RelabelType *)newe)->resulttypmod = exprTypmod(e);
+		}
 		newcoercedargs = lappend(newcoercedargs, newe);
 	}
 
@@ -3622,4 +3666,19 @@ ParseExprKindName(ParseExprKind exprKind)
 			 */
 	}
 	return "unrecognized expression kind";
+}
+
+// Expands checksum(*) to checksum(c1, c2, ...)
+List *
+ExpandChecksumStar(ParseState *pstate, FuncCall *fn, int location)
+{
+        List      *target = NIL;
+        ListCell   *lc;
+        foreach(lc, pstate->p_namespace)
+        {
+                ParseNamespaceItem *nsitem = (ParseNamespaceItem *) lfirst(lc);
+                target = list_concat(target, expandNSItemVars(nsitem, 0, location, NULL));
+        }
+        fn->agg_star = false;
+        return target;
 }
