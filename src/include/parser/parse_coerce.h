@@ -70,6 +70,7 @@ extern Oid	select_common_type(ParseState *pstate, List *exprs,
 extern Node *coerce_to_common_type(ParseState *pstate, Node *node,
 								   Oid targetTypeId,
 								   const char *context);
+extern bool verify_common_type(Oid common_type, List *exprs);
 
 extern bool check_generic_type_consistency(const Oid *actual_arg_types,
 										   const Oid *declared_arg_types,
@@ -111,7 +112,15 @@ typedef bool (*determine_datatype_precedence_hook_type) (Oid typeId1, Oid typeId
 /*
  * T-SQL has different rules for string literal datatype coercions
  */
-typedef void (*coerce_string_literal_hook_type) (Const *newcon, char *value, CoercionContext ccontext);
+typedef Node *(*coerce_string_literal_hook_type) (ParseCallbackState *pcbstate,
+												  Oid targetTypeId,
+												  int32 targetTypeMod,
+												  int32 baseTypeMod,
+												  Const *newcon,
+												  char *value,
+												  CoercionContext ccontext,
+												  CoercionForm cformat,
+												  int location);
 
 /*
  * T-SQL may forbid casting from string literal to certain datatypes (i.e. binary, varbinary)

@@ -29,6 +29,7 @@
 #include "nodes/nodeFuncs.h"
 #include "optimizer/clauses.h"
 #include "optimizer/optimizer.h"
+#include "parser/parsetree.h"
 #include "pgstat.h"
 #include "postmaster/autovacuum.h"
 #include "statistics/extended_stats_internal.h"
@@ -1294,6 +1295,17 @@ statext_mcv_clauselist_selectivity(PlannerInfo *root, List *clauses, int varReli
 	Bitmapset **list_attnums;
 	int			listidx;
 	Selectivity sel = 1.0;
+	RangeTblEntry *rte = planner_rt_fetch(rel->relid, root);
+
+	/*
+	 * When dealing with regular inheritance trees, ignore extended stats
+	 * (which were built without data from child rels, and thus do not
+	 * represent them). For partitioned tables data there's no data in the
+	 * non-leaf relations, so we build stats only for the inheritance tree.
+	 * So for partitioned tables we do consider extended stats.
+	 */
+	if (rte->inh && rte->relkind != RELKIND_PARTITIONED_TABLE)
+		return 1.0;
 
 	/* check if there's any stats that might be useful for us. */
 	if (!has_stats_of_kind(rel->statlist, STATS_EXT_MCV))
