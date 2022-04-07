@@ -46,7 +46,7 @@ To build Babelfish, you will need access to a user with root privileges, so you 
 Assuming that you're currently located inside the extracted tarball folder, set the `PG_SRC` as follows:
 
 ```sh
-export PG_SRC=$(dirname $PWD)
+export PG_SRC=$(realpath $PWD)
 ```
 
 If the tarballs were extracted in a specific path, use the corresponding one in the above setting. 
