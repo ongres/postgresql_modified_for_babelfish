@@ -33,7 +33,10 @@ sudo apt-get update && sudo apt install -y --no-install-recommends \
   curl openjdk-8-jre openssl \
   g++ libssl-dev python-dev libpq-dev \
   pkg-config unzip libutfcpp-dev \
-  gnupg unixodbc-dev
+  gnupg unixodbc-dev 
+
+# Other dependencies not strictly related to Babelfish
+sudo apt install -y net-tools unzip
 ```
 
 Many of the Babelfish prerequisites are part of a typical Linux distribution.  You may find that the packages on your distribution use a similar (but not identical) name.  
@@ -63,7 +66,7 @@ export ANTLR4_VERSION=4.9.3
 export ANTLR4_JAVA_BIN=/usr/bin/java
 export ANTLR4_RUNTIME_LIBRARIES=/usr/include/antlr4-runtime
 export ANTLR_EXECUTABLE=/usr/local/lib/antlr-${ANTLR4_VERSION}-complete.jar
-export ANTLR_RUNTIME=../antlr4
+export ANTLR_RUNTIME=~/antlr4
 ```
 
 The [Antlr 4.9.3 Runtime](https://www.antlr.org/) files are distributed with the Babelfish source code.  Use the following commands to copy the files into place:
@@ -75,9 +78,12 @@ sudo cp ${PG_SRC}/contrib/babelfishpg_tsql/antlr/thirdparty/antlr/antlr-${ANTLR4
 After copying the ANTLR .jar files into place, compile ANTLR: 
 
 ```sh
+cd ${HOME}
+
 wget http://www.antlr.org/download/antlr4-cpp-runtime-${ANTLR4_VERSION}-source.zip
-unzip -d antlr4 antlr4-cpp-runtime-${ANTLR4_VERSION}-source.zip 
-cd antlr4
+unzip -d ${ANTLR_RUNTIME} antlr4-cpp-runtime-${ANTLR4_VERSION}-source.zip
+
+cd ${ANTLR_RUNTIME}
 mkdir build && cd build 
 cmake .. -D ANTLR_JAR_LOCATION=/usr/local/lib/antlr-${ANTLR4_VERSION}-complete.jar -DCMAKE_INSTALL_PREFIX=/usr/local -DWITH_DEMO=True
 make -j 4
@@ -147,7 +153,11 @@ The steps required to create a new cluster and start the service are very simila
 sudo mkdir -p /var/lib/babelfish/1.0
 
 sudo adduser postgres --home /var/lib/babelfish
+```
 
+Ensure that the related folders hold the permissions for the service user:
+
+```sh
 sudo chown -R postgres: /opt/babelfish/
 sudo chown -R postgres: /var/lib/babelfish/
 ```
